@@ -34,8 +34,11 @@ Under debugger, follow the execution, stepping through the entire code.
 ## Boot sequence
 
 **Question:** did you understand the exception vector?
-
+It defines a bunch of possible exceptions that can occur during execution and points to the code that will be used for recovery from each
 **Question:** did you understand the BSS section initialization?
+
+stmia R0!, {R3,R4,R5} ; Store R3-R5 to R0: add 12 to R0
+BSS: where we store uninitialized global vars
 
 **Question:** did you understand why there is a stack and where it is and
 how it grows?
@@ -71,7 +74,7 @@ Not looking at the implementation in the source file `uart.c`,
 but looking at the header file `uart.h`, let's explain this loop.
 
 **Question:** explain the above loop.
-
+constantly polls UART0 to fill the variable c with it. Once there is something new in it to put in c, it checks the new value in c. If it's the carriage return, it goes to the beginning of the line and goes to a new line. Otherwise it puts what's in c where the cursor is pointing.
 **Question:** what are the bytes flowing back and forth through the UART0? 
 
 Let's continue with `ECHO_ZZZ` as **defined**.
@@ -99,7 +102,7 @@ Let's continue with `ECHO_ZZZ` as **defined**.
 ```
 
 **Question:** what is the printing of "Zzzz...." telling you? 
-
+It signifies that, since the beginning of the code or the last Zzzz.... printed, there have been a cumulated 50000000 loop cycles where there has not been a character input in the terminal window.
 # Discussing Serial Lines
 
 Let's come back to one of our previous questions:

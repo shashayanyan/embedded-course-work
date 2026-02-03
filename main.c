@@ -38,6 +38,9 @@ void check_memory() {
 void _start() {
   check_memory();
 
+  // volatile uint32_t *p = (uint32_t *)0xDEADBEEF;
+  // uint32_t x = *p;
+
   uart_send_string(UART0, "\nFor information:\n");
   uart_send_string(UART0, "  - Quit with \"C-a c\" to get to the QEMU console.\n");
   uart_send_string(UART0, "  - Then type in \"quit\" to stop QEMU.\n");

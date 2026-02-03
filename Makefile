@@ -12,7 +12,7 @@ BOARD=versatile
 MEMSIZE=16
 
 # Object files to build and link together
-objs= exception.o startup.o main.o uart.o
+objs= exception.o startup.o main.o uart.o kprintf.o
 
 #======================================================================
 # GENERIC PART OF THE MAKEFILE BELOW

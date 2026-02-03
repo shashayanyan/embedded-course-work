@@ -80,9 +80,9 @@ $ ls -alh build/versatile/kernel.*
 ```
 
 **Question:** explain why the `kernel.elf` is larger than the `kernel.bin`
-
+`kernel.elf` is larger than `kernel.bin` because it contains extra data that is not present in the raw binary `kernel.bin` file. This extra data is used by debuggers and linkers and is not needed for the program to run on the target hardware.
 **Question:** explain the code in the function `check_memory`.
-
+It verifies that the stack pointer is pointing to a valid memory address (not surpassing the maximum authorized address for this process) and if that's not the case, it calls the panicking function.
 ## Adding an embedded `printf`
 
 Let's add some more code: an small embedded version of printf,
