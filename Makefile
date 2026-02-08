@@ -9,10 +9,10 @@ BOARD=versatile
 
 # Number of KB to be used, try first with 16,
 # later on, you will need more, but less than 1024.
-MEMSIZE=16
+MEMSIZE=32
 
 # Object files to build and link together
-objs= exception.o startup.o main.o uart.o kprintf.o
+objs= exception.o startup.o main.o uart.o kprintf.o console.o
 
 #======================================================================
 # GENERIC PART OF THE MAKEFILE BELOW

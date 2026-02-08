@@ -87,7 +87,7 @@ First, let's convince ourselves that we do have a
 terminal with no echo, that the echo comes from our code.
 Change the code in the function `_start` to stop writing
 in the UART0. 
-
+> commenting send
 What do you see? Nothing, right?
 None of the typed keys on the keyboard echoes on the terminal.
 

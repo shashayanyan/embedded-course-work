@@ -1,5 +1,6 @@
 #include "main.h"
 #include "uart.h"
+#include "console.h"
 
 
 /*
@@ -31,43 +32,63 @@ void check_memory() {
     panic();
 }
 
+void line_handler(char* str) {
+  int len = 0;
+  while(str[len] != '\0') {
+    len++;
+  }
+
+  kprintf(" -> ");
+  for (int i = len - 1; i >= 0; i--) {
+    kprintf("%c", str[i]);
+  }
+}
+
 /**
  * This is the C entry point, upcalled once the hardware has been setup properly
  * in assembly language, see the startup.s file.
  */
 void _start() {
-  check_memory();
+  console_init(line_handler);
+  cursor_hide();
 
-  // volatile uint32_t *p = (uint32_t *)0xDEADBEEF;
-  // uint32_t x = *p;
+  char cursor_chars[] = {'|', '/', '-', '\\'};
+  int cursor_idx = 0;
+  uint8_t cursor_color = RED;
+  long long counter = 0;
 
-  uart_send_string(UART0, "\nFor information:\n");
-  uart_send_string(UART0, "  - Quit with \"C-a c\" to get to the QEMU console.\n");
-  uart_send_string(UART0, "  - Then type in \"quit\" to stop QEMU.\n");
-
-  uart_send_string(UART0, "\nHello world!\n");
-
-  int i = 0;
-  int count = 0;
   while (1) {
     uint8_t c;
-#ifdef ECHO_ZZZ
-    while (0 == uart_receive(UART0, &c)) {
-      count++;
-      if (count > 50000000) {
-        uart_send_string(UART0, "\n\rZzzz....\n\r");
-        count = 0;
-      }
+    if (uart_receive(UART0, &c) == 1) {
+        // Erase the old cursor 
+        int r, col;
+        cursor_position(&r, &col);
+        cursor_at(r, col);
+        kprintf(" ");
+        cursor_at(r, col);
+
+        console_echo(c);
     }
-#else
-    if (0==uart_receive(UART0,&c))
-      continue;
-#endif
-    if (c == 13) {
-      uart_send(UART0, '\r');
-      uart_send(UART0, '\n');
-    } else {
-      uart_send(UART0, c);
+
+    counter++;
+    if (counter > 2000000) { // 500ms?
+      counter = 0;
+
+      int r, col;
+      cursor_position(&r, &col);
+
+      // Draw the new cursor
+      cursor_at(r, col);
+      console_color(cursor_color);
+      kprintf("%c", cursor_chars[cursor_idx]);
+      
+      // Restore cursor position and color
+      cursor_at(r, col);
+      console_color(COLOR_RESET);
+
+      // Update for next 
+      cursor_idx = (cursor_idx + 1) % 4;
+      cursor_color = (cursor_color == RED) ? WHITE : RED;
     }
   }
 }
