@@ -46,3 +46,12 @@ A C Makefile for early bachelor's courses PTSD
 ## [Advanced debugging](./debugging.md)
 - This file walked me through debugging for bare-metal with GDB. `breakpoints` are same like normal linux but with a limit on quantity. I also noted that how much valuable memory a code as simple as kprintf can consume. 
 - During the debuggin, we manually triggered a data abort and looked at addresses informing on exceptions, although I'm still not sure I understood that correctly.
+
+# Console
+## Terminal Discovery
+I didn't know anything about control sequences in terminal, quite interesting. Although it took me a while to find out exactly what these are on my azerty keyboard that I use qwerty on, and then to use them in the program's terminal.
+
+## Implementation
+- the base implementation is quite straightforward, knowing the sequences and combining the functions quickly allows us to imlpement the simple console.
+- the blinking cursor and the callback funtion are also simple to use, but I needed to look again to remember the function passing syntax in c.
+- Now the console has a star cursor and Davinci encryption.
