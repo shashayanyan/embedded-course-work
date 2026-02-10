@@ -1,6 +1,7 @@
 #include "main.h"
 #include "uart.h"
 #include "console.h"
+#include "event.h"
 
 
 /*
@@ -44,23 +45,37 @@ void line_handler(char* str) {
   }
 }
 
-/**
- * This is the C entry point, upcalled once the hardware has been setup properly
- * in assembly language, see the startup.s file.
- */
-void _start() {
-  console_init(line_handler);
-  cursor_hide();
+// Reaction for the cursor
+void animate_cursor_reaction(void* cookie) {
+    static char cursor_chars[] = {'|', '/', '-', '\\'};
+    static int cursor_idx = 0;
+    static uint8_t cursor_color = RED;
 
-  char cursor_chars[] = {'|', '/', '-', '\\'};
-  int cursor_idx = 0;
-  uint8_t cursor_color = RED;
-  long long counter = 0;
+    int r, col;
+    cursor_position(&r, &col);
 
-  while (1) {
+    // draw new cursor
+    cursor_at(r, col);
+    console_color(cursor_color);
+    kprintf("%c", cursor_chars[cursor_idx]);
+    
+    // Restore cursor position and color for user typing
+    cursor_at(r, col);
+    console_color(COLOR_RESET);
+
+    // Update next frame
+    cursor_idx = (cursor_idx + 1) % 4;
+    cursor_color = (cursor_color == RED) ? WHITE : RED;
+
+    // repost the event for the next frame
+    event_post(animate_cursor_reaction, NULL, 500000); // ~500ms??
+}
+
+// Reaction for polling UART
+void poll_uart_reaction(void* cookie) {
     uint8_t c;
     if (uart_receive(UART0, &c) == 1) {
-        // Erase the old cursor 
+        // Erase the old cursor before processing the character
         int r, col;
         cursor_position(&r, &col);
         cursor_at(r, col);
@@ -69,28 +84,26 @@ void _start() {
 
         console_echo(c);
     }
+    // repost the event to continue polling
+    event_post(poll_uart_reaction, NULL, 1);
+}
 
-    counter++;
-    if (counter > 2000000) { // 500ms?
-      counter = 0;
 
-      int r, col;
-      cursor_position(&r, &col);
+/**
+ * This is the C entry point, upcalled once the hardware has been setup properly
+ * in assembly language, see the startup.s file.
+ */
+void _start() {
+  console_init(line_handler);
+  event_init();
+  cursor_hide();
 
-      // Draw the new cursor
-      cursor_at(r, col);
-      console_color(cursor_color);
-      kprintf("%c", cursor_chars[cursor_idx]);
-      
-      // Restore cursor position and color
-      cursor_at(r, col);
-      console_color(COLOR_RESET);
+  // post initial events
+  event_post(poll_uart_reaction, NULL, 1);
+  event_post(animate_cursor_reaction, NULL, 1);
 
-      // Update for next 
-      cursor_idx = (cursor_idx + 1) % 4;
-      cursor_color = (cursor_color == RED) ? WHITE : RED;
-    }
-  }
+  // start the scheduler.
+  event_loop();
 }
 
 
