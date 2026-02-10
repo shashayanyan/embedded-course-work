@@ -55,3 +55,10 @@ I didn't know anything about control sequences in terminal, quite interesting. A
 - the base implementation is quite straightforward, knowing the sequences and combining the functions quickly allows us to imlpement the simple console.
 - the blinking cursor and the callback funtion are also simple to use, but I needed to look again to remember the function passing syntax in c.
 - Now the console has a star cursor and Davinci encryption.
+
+# Event-Driven Scheduler
+- The old `while(1)` super-loop in `main.c` was getting a bit messy, mixing the cursor animation with keyboard polling. Plus, it was busy-waiting all the time, which isn't great.
+- So, I refactored the whole thing to use a basic event-driven scheduler, like the one from the lecture slides. The idea is to break tasks into small, non-blocking "reactions". I created `event.c` to manage a simple queue of these reactions in a static array. The new `event_loop()` function picks the next ready event and runs it. A key choice is that if there's nothing to do, it tells the CPU to idle with a `wfi` (Wait For Interrupt) instruction instead of spinning uselessly. I got a bit confused with the `sleep_until_next_event()` in the slides and found htis as a solution with the help of google's gen ai gemini.
+- The old logic from the main loop was split into two reactions: `poll_uart_reaction` for checking the keyboard and `animate_cursor_reaction` for the blinking cursor. Each one re-schedules itself by re-posting to the event queue.
+- A big assumption here is the timer. The `time_now()` function is just a placeholder software counter for now. 
+- Also a note on the event queue, it is not a sorted array for now just because I find it easier to implement this way. I might make it a sorted array if I see that it is causing problems in later stages.
