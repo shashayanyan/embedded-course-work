@@ -39,8 +39,19 @@ unused_handler_addr: .word _unused_handler
 irq_handler_addr: .word _isr_handler
 fiq_handler_addr: .word _fiq_handler
 
+/* _isr_handler:
+ *   b _isr_handler 
+ */
+
 _isr_handler:
-    b _isr_handler
+    sub lr, lr, #4 /* adjust return address (LR_irq is PC+4, we need PC) */
+    
+    stmfd sp!, {r0-r12, lr} /* save Context: Push r0-r12 and lr onto the IRQ stack */
+
+    bl isr /* call the C dispatcher */
+
+    ldmfd sp!, {r0-r12, pc}^     /* restore Context: Pop registers and restore CPSR from SPSR */
+
 
 _unused_handler:
     b _unused_handler // unused interrupt occurred

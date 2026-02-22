@@ -50,5 +50,11 @@ SECTIONS
  . = ALIGN(8);
  . = . + 0x1000; /* 4KB of stack memory */
  stack_top = .;
+  /*
+  * Reserving 4KB for IRQ stack
+  */
+ . = ALIGN(8);
+ . = . + 0x1000; 
+ irq_stack_top = .;
  
 }

@@ -1,5 +1,6 @@
 #include "main.h"
 #include "uart.h"
+#include "isr.h"
 
 /**
  * PL011_T UART
@@ -29,6 +30,16 @@
 #define UART_TXFF (1<<5)
 #define UART_RXFE (1<<4)
 #define UART_BUSY (1<<3)
+// ======================================
+// UART Interrupt Mask Set/Clear Register
+#define UART_IMSC 0x038
+// UART Interrupt Clear Register
+#define UART_ICR  0x044
+// Receive Interrupt Mask bit (Bit 4)
+#define UART_RXIM (1 << 4)
+static void (*user_handler)(void*) = NULL;
+static void* user_cookie = NULL;
+// ======================================
 
 /*
  * See "uart.h"
@@ -63,4 +74,30 @@ void uart_send_string(void* uart, const unsigned char *s) {
     uart_send(uart, (uint8_t)*s);
     s++;
   }
+}
+
+// handler to clear the hardware interrupt source
+static void internal_uart_handler(uint32_t irq, void* unused) {
+    // 1. Call the user's logic if exists
+    if (user_handler) {
+        user_handler(user_cookie);
+    }
+
+    // 2. Acknowledge/Clear the interrupt at the UART controller
+    // without this, the line stays high and the CPU hangs re-entering ISR.
+    mmio_write16(UART0, UART_ICR, UART_RXIM); 
+}
+
+void uart_enable_interrupt(void (*handler)(void*), void* cookie) {
+    user_handler = handler;
+    user_cookie = cookie;
+
+    // 1. Register our internal handler with the VIC
+    irq_enable(UART0_IRQ, internal_uart_handler, NULL);
+
+    // 2. Unmask the RX interrupt in the UART controller
+    // This tells the UART to pull the IRQ line when data arrives.
+    uint16_t imsc = mmio_read16(UART0, UART_IMSC);
+    imsc |= UART_RXIM;
+    mmio_write16(UART0, UART_IMSC, imsc);
 }

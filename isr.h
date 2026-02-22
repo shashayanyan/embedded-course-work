@@ -73,7 +73,7 @@ void irqs_setup();
 void irqs_enable();
 void irqs_disable();
 void wfi(void);
-
+void irq_init(void);
 /*
  * Enable the given interrupt,
  * like UART0_IRQ

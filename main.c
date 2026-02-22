@@ -2,6 +2,7 @@
 #include "uart.h"
 #include "console.h"
 #include "event.h"
+#include "isr.h"
 
 
 /*
@@ -88,6 +89,16 @@ void poll_uart_reaction(void* cookie) {
     event_post(poll_uart_reaction, NULL, 1);
 }
 
+// simple polling reaction to "read"
+void on_uart_char(void* cookie) {
+    uint8_t c;
+    // We know data is ready because we got an interrupt!
+    if (uart_receive(UART0, &c)) {
+        console_echo(c);
+    }
+    // NO event_post here! We wait for the next interrupt.
+}
+
 
 /**
  * This is the C entry point, upcalled once the hardware has been setup properly
@@ -96,11 +107,18 @@ void poll_uart_reaction(void* cookie) {
 void _start() {
   console_init(line_handler);
   event_init();
-  cursor_hide();
+  //cursor_hide();
+
+  // add interrupt logic
+  irqs_setup();
+  irq_init();
+  uart_enable_interrupt(on_uart_char, NULL);
+  irqs_enable();
+  
 
   // post initial events
-  event_post(poll_uart_reaction, NULL, 1);
-  event_post(animate_cursor_reaction, NULL, 1);
+  //event_post(poll_uart_reaction, NULL, 1);
+  //event_post(animate_cursor_reaction, NULL, 1);
 
   // start the scheduler.
   event_loop();

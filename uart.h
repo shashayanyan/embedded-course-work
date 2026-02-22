@@ -38,5 +38,7 @@ void uart_send(void* uart, uint8_t b);
  */
 void uart_send_string(void* uart, const unsigned char *s);
 
+static void internal_uart_handler(uint32_t irq, void* unused);
+void uart_enable_interrupt(void (*handler)(void*), void* cookie);
 
 #endif /* _UART_H_ */
