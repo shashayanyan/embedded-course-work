@@ -4,6 +4,10 @@
 
 #define MAX_EVENTS 32
 
+extern void irqs_disable(void);
+extern void irqs_enable(void);
+extern void wfi(void);
+
 // not a sorted list yet, maybe change later?
 static struct event event_queue[MAX_EVENTS];
 static int num_events = 0;
@@ -43,6 +47,7 @@ void event_post(void (*react)(void*), void* cookie, uint32_t delay) {
 
 void event_loop(void) {
     for (;;) {
+        // --- 1. SEARCH FOR READY EVENTS ---
         uint64_t now = time_now();
         int best_event_idx = -1;
         uint64_t min_eta = UINT64_MAX;
@@ -54,7 +59,7 @@ void event_loop(void) {
                 best_event_idx = i;
             }
         }
-
+        // --- 2. DO THE WORK (if any) ---
         if (best_event_idx != -1 && event_queue[best_event_idx].eta <= now) {
             // Found an event to run!
             struct event evt = event_queue[best_event_idx];
@@ -65,9 +70,33 @@ void event_loop(void) {
 
             evt.react(evt.cookie);
 
-        } else {
-            // No events ready, wait for interrupt? what else can I do here?
-            asm volatile("wfi");
+        } 
+        // --- 3. NO WORK? SLEEP SECURELY --- (based on the emails...)
+        else {
+            // Disable interrupts to close the race condition window
+            irqs_disable();
+            
+            // Check the queue ONE MORE TIME. 
+            // An interrupt might have fired and posted an event
+            // right before we disabled the interrupts...
+            now = time_now();
+            best_event_idx = -1;
+            min_eta = UINT64_MAX;
+            for (int i = 0; i < MAX_EVENTS; i++) {
+                if (event_queue[i].react != NULL && event_queue[i].eta < min_eta) {
+                    min_eta = event_queue[i].eta;
+                    best_event_idx = i;
+                }
+            }
+
+            if (best_event_idx == -1 || event_queue[best_event_idx].eta > now) {
+                // Still no work. It is safe to sleep.
+                wfi();           // sleep
+                irqs_enable();   // Re-enable interrupts
+            } else {
+                // Work snuck in so don't sleep, just re-enable interrupts and loop around...
+                irqs_enable();
+            }
         }
     }
 }
