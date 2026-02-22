@@ -62,3 +62,20 @@ I didn't know anything about control sequences in terminal, quite interesting. A
 - The old logic from the main loop was split into two reactions: `poll_uart_reaction` for checking the keyboard and `animate_cursor_reaction` for the blinking cursor. Each one re-schedules itself by re-posting to the event queue.
 - A big assumption here is the timer. The `time_now()` function is just a placeholder software counter for now. 
 - Also a note on the event queue, it is not a sorted array for now just because I find it easier to implement this way. I might make it a sorted array if I see that it is causing problems in later stages.
+
+# Hardware Interrupts & VIC
+
+- Moved away from software polling in the event loop to a hardware interrupt model. No more busy-waiting!
+
+- Implemented the `_isr` entry point. When an interrupt fires, this assembly routine saves the current context, calls the C dispatcher, and then restores the context.
+
+- Had to update the `versatile.ld` linker script to reserve a dedicated 4KB stack for interrupts. 
+    - The ARM processor switches to a different banked stack pointer (sp) when it enters interrupt mode, so it needs its own memory space to avoid corrupting the system stack.
+
+- isr.c: Built a manager for the VIC. It reads the `VICIRQSTATUS` register to find out exactly which device pulled the hardware interrupt line, then calls the appropriate registered C callback.
+
+
+- Set up the `UART controller` to trigger interrupts on receive by unmasking it (UARTIMSC). 
+    - The software handler must explicitly acknowledge and clear the interrupt on the UART chip itself (UARTICR). If you forget this, the interrupt line stays high and the CPU hangs in an infinite loop re-entering the ISR.
+
+- Added some pieces of code in different files to test the functionality is correct, most of them are commented out now. Also disabled the cursor animation for my sanity.
