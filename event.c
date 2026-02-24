@@ -1,5 +1,6 @@
 #include "event.h"
 #include "main.h" // For NULL
+#include "timer.h"
 #include <stddef.h>
 
 #define MAX_EVENTS 32
@@ -11,11 +12,10 @@ extern void wfi(void);
 // not a sorted list yet, maybe change later?
 static struct event event_queue[MAX_EVENTS];
 static int num_events = 0;
-static uint64_t ticks = 0;
 
 uint64_t time_now(void) {
-    // For now a mocking ticker of a logical clock ...
-    return ticks++;
+    // returning the real hardware-driven milliseconds
+    return system_ticks;
 }
 
 void event_init(void) {

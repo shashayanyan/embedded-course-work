@@ -3,7 +3,7 @@
 #include "console.h"
 #include "event.h"
 #include "isr.h"
-
+#include "timer.h"
 
 /*
  * Define ECHO_ZZZ to have a periodic reminder that this code is polling
@@ -69,7 +69,7 @@ void animate_cursor_reaction(void* cookie) {
     cursor_color = (cursor_color == RED) ? WHITE : RED;
 
     // repost the event for the next frame
-    event_post(animate_cursor_reaction, NULL, 500000); // ~500ms??
+    event_post(animate_cursor_reaction, NULL, 500); // ~500ms??
 }
 
 // Reaction for polling UART
@@ -112,13 +112,14 @@ void _start() {
   // add interrupt logic
   irqs_setup();
   irq_init();
+  timer_init();
   uart_enable_interrupt(on_uart_char, NULL);
   irqs_enable();
   
 
   // post initial events
   //event_post(poll_uart_reaction, NULL, 1);
-  //event_post(animate_cursor_reaction, NULL, 1);
+  event_post(animate_cursor_reaction, NULL, 500);
 
   // start the scheduler.
   event_loop();
