@@ -35,16 +35,50 @@ void check_memory() {
     panic();
 }
 
+// for command matching
+static int starts_with(const char *prefix, const char *str){
+  while(*prefix){
+    if (*prefix != *str){
+      return 0; //missmatch :/
+    }
+    prefix++;
+    str++;
+  }
+  return 1; //matched
+}
+
 void line_handler(char* str) {
-  int len = 0;
-  while(str[len] != '\0') {
-    len++;
+  if (starts_with("echo ", str)) {
+    console_puts(&str[5]);
+    console_puts("\r\n"); // Make sure to use \r\n, not just \n
+  } 
+  else if (starts_with("davinci ", str)) {
+    char* payload = &str[8];
+    int len = 0;
+    while(payload[len] != '\0') len++;
+    int cursor_col; int cursor_row;
+    cursor_position(&cursor_row, &cursor_col);
+    //console_puts(" -> ");
+    for (int i = len - 1; i >= 0; i--) {
+        // stream_write or console_echo a single char
+        uint8_t c = payload[i];
+        stream_write(0, &c, 1);
+        cursor_col++; // Keep cursor in sync!
+    }
+    cursor_at(cursor_row, cursor_col);
+    console_puts("\r\n");
+  } 
+  else if (str[0] == '\0') {
+    // Empty enter, just print the prompt again
+  } 
+  else {
+    console_puts("[ERROR] Unknown Command...\r\n");
+    console_puts(str);
+    console_puts("\r\n");
   }
 
-  console_puts(" -> ");
-  for (int i = len - 1; i >= 0; i--) {
-    console_echo(str[i]);
-  }
+  // Print the prompt for the next line
+  console_puts("simple-shell>$ ");
 }
 
 // Reaction for the cursor
@@ -132,8 +166,10 @@ void _start() {
   // post initial events
   //event_post(poll_uart_reaction, NULL, 1);
   // 7. Start background tasks and enter the Event Pump
-  event_post(animate_cursor_reaction, NULL, 500);
+  //event_post(animate_cursor_reaction, NULL, 500); 
+  // animate_cursor removed, I'm confident now that the timer and interrupts work...
 
+  kprintf("[DEBUG] Hello Youssef From debug console!!!\n");
   // start the scheduler.
   event_loop();
 }

@@ -19,6 +19,12 @@ void console_putc(uint8_t c) {
 void console_puts(const char* str) {
   int len = 0;
   while (str[len] != '\0') {
+      if (str[len] == '\n') {
+          cursor_row++;
+          cursor_col = 0;
+      } else if (str[len] != '\r') {
+          cursor_col++;
+      }
       len++;
   }
   // Write the whole string to the ring buffer at once
@@ -107,6 +113,8 @@ void console_clear() {
   /*kprintf("%c[H%c[2J", 27, 27);*/console_puts("\033[H\033[2J");
   cursor_row = 0;
   cursor_col = 0;
+  console_puts("List of commands:\n- echo str :: repeats the str\n- davinci str :: applies da vinci code to str and prints it\n- PRESS C-a c to stop the console\n");
+  console_puts("simple-shell>$ ");
 }
 
 void console_init(void (*callback)(char*)) {
@@ -139,27 +147,26 @@ void console_echo(uint8_t byte) {
           line_pos--;
           cursor_left();
           console_putc(' ');
-          //cursor_left();
+          cursor_col++; // was missing
+          cursor_left();
+          // nvm figured it out
+          //console_puts("\b \b"); // for some reason this works but not the 3 lines above
         }
       } else if (byte == '\n' || byte == '\r') { // enter
         line_buffer[line_pos] = '\0';
         
-        if (line_callback) {
-          int saved_row, saved_col;
-          cursor_position(&saved_row, &saved_col);
-          line_callback(line_buffer);
-          cursor_at(saved_row, saved_col);
-        }
-
+        // 1. Move the terminal to a new line visually BEFORE the callback
         console_puts("\r\n");
-        cursor_row++;
-        cursor_col = 0;
         line_pos = 0;
+
+        // 2. Run the command (The callback will print the output and the new prompt)
+        if (line_callback) {
+          line_callback(line_buffer);
+        }
       } else if (byte == 3) { // Ctrl-C
-        console_puts("^C\r\n");
-        cursor_row++;
-        cursor_col = 0;
+        cursor_col = 16;
         line_pos = 0;
+        console_clear();
       } else if (byte == 27) {
         echo_state = ESCAPE;
       }
