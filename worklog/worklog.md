@@ -91,3 +91,13 @@ I didn't know anything about control sequences in terminal, quite interesting. A
 - The Timer ISR increments a global system_ticks variable. time_now() now returns actual milliseconds. The system now has a reliable heartbeat, and the event scheduler can accurately manage time-delayed background tasks.
 
 - Cursor animation restored. Observation: now it animates twice per second without having to type, which is what we would expect.
+
+# Separating Debug Output
+
+- Prevents OS (?) debug messages (kprintf) from colliding with the user interface on the main terminal.
+
+- Re-routed kprintf to transmit via the UART1 hardware base address instead of UART0.
+
+- QEMU Config: Updated the Makefile to instantiate a second serial port (-serial file:debug.log)
+
+- Console Config: Added a helper to use uart0 still for console. Not sure if needed for now?
