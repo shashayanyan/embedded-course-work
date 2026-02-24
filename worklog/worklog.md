@@ -79,3 +79,15 @@ I didn't know anything about control sequences in terminal, quite interesting. A
     - The software handler must explicitly acknowledge and clear the interrupt on the UART chip itself (UARTICR). If you forget this, the interrupt line stays high and the CPU hangs in an infinite loop re-entering the ISR.
 
 - Added some pieces of code in different files to test the functionality is correct, most of them are commented out now. Also disabled the cursor animation for my sanity.
+
+# Hardware Timer (timer.h/.c)
+
+- The time_now() function until now was just a fake counter driven by the event_loop. 
+
+- Implemented a driver for the ARM SP804 Dual-Timer module [timer.c](../timer.c).
+
+- Set Timer 0 to Periodic Mode, 32-bit size, and enabled its interrupts. By loading the value 1000 against the 1MHz clock, the timer hardware now fires an interrupt exactly once every 1 millisecond.
+
+- The Timer ISR increments a global system_ticks variable. time_now() now returns actual milliseconds. The system now has a reliable heartbeat, and the event scheduler can accurately manage time-delayed background tasks.
+
+- Cursor animation restored. Observation: now it animates twice per second without having to type, which is what we would expect.
