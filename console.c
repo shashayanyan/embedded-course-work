@@ -10,6 +10,30 @@ static int cursor_col;
 // line callback
 static void (*line_callback)(char*);
 
+// Helper to print a string to UART0
+void console_puts(const char* str) {
+    while (*str) {
+        uart_send(UART0, *str++);
+    }
+}
+
+// Helper to print an integer to UART0 (for cursor positioning)
+void console_put_int(int num) {
+    char buf[10];
+    int i = 0;
+    if (num == 0) {
+        uart_send(UART0, '0');
+        return;
+    }
+    while (num > 0) {
+        buf[i++] = (num % 10) + '0';
+        num /= 10;
+    }
+    while (i > 0) {
+        uart_send(UART0, buf[--i]);
+    }
+}
+
 void cursor_left() {
   if (cursor_col > 0) {
     cursor_col--;
@@ -41,7 +65,13 @@ void cursor_up() {
 void cursor_at(int row, int col) {
   cursor_row = row;
   cursor_col = col;
-  kprintf("%c[%d;%dH", 27, row + 1, col + 1);
+  /*kprintf("%c[%d;%dH", 27, row + 1, col + 1);*/
+  uart_send(UART0, 27); // ESC
+  uart_send(UART0, '[');
+  console_put_int(row + 1);
+  uart_send(UART0, ';');
+  console_put_int(col + 1);
+  uart_send(UART0, 'H');
 }
 
 void cursor_position(int* row, int* col) {
@@ -50,19 +80,22 @@ void cursor_position(int* row, int* col) {
 }
 
 void cursor_hide() {
-  kprintf("%c[?25l", 27);
+  /*kprintf("%c[?25l", 27);*/console_puts("\033[?25l");
 }
 
 void cursor_show() {
-  kprintf("%c[?25h", 27);
+  /*kprintf("%c[?25h", 27);*/console_puts("\033[?25h");
 }
 
 void console_color(uint8_t color) {
-  kprintf("%c[%dm", 27, color);
+  /*kprintf("%c[%dm", 27, color);*/
+  console_puts("\033[");
+  console_put_int(color);
+  console_puts("m");
 }
 
 void console_clear() {
-  kprintf("%c[H%c[2J", 27, 27);
+  /*kprintf("%c[H%c[2J", 27, 27);*/console_puts("\033[H\033[2J");
   cursor_row = 0;
   cursor_col = 0;
 }
@@ -88,7 +121,7 @@ void console_echo(uint8_t byte) {
     case NORMAL:
       if (byte >= 32 && byte <= 126) { // printable ASCII
         if (line_pos < LINE_LEN - 1) {
-          kprintf("%c", byte);
+          uart_send(UART0, byte);
           line_buffer[line_pos++] = byte;
           cursor_col++;
         }
@@ -96,7 +129,7 @@ void console_echo(uint8_t byte) {
         if (line_pos > 0) {
           line_pos--;
           cursor_left();
-          kprintf(" ");
+          uart_send(UART0, ' ');
           //cursor_left();
         }
       } else if (byte == '\n' || byte == '\r') { // enter
@@ -109,12 +142,12 @@ void console_echo(uint8_t byte) {
           cursor_at(saved_row, saved_col);
         }
 
-        kprintf("\n");
+        console_puts("\r\n");
         cursor_row++;
         cursor_col = 0;
         line_pos = 0;
       } else if (byte == 3) { // Ctrl-C
-        kprintf("^C\n");
+        console_puts("^C\r\n");
         cursor_row++;
         cursor_col = 0;
         line_pos = 0;

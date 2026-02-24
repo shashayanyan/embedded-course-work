@@ -27,7 +27,7 @@ ifeq ($(BOARD),versatile)
 	QCPU=cortex-a8
   # A few QEMU options
   VGA=-nographic
-  SERIAL=-serial mon:stdio  
+  SERIAL=-serial mon:stdio -serial file:debug.log
   MEMORY="$(MEMSIZE)K"  
   MACHINE=versatilepb
 	# set compiler flags

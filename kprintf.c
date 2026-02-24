@@ -47,7 +47,7 @@ int kvprintf(char const *fmt, void (*func)(uint8_t, void*), void *arg, int radix
 
 static
 void kputchar(uint8_t code, void *arg) {
-	uart_send(UART0,code);
+	uart_send(UART1,code);
 }
 
 /**********************************************************************************************

@@ -40,9 +40,9 @@ void line_handler(char* str) {
     len++;
   }
 
-  kprintf(" -> ");
+  console_puts(" -> ");
   for (int i = len - 1; i >= 0; i--) {
-    kprintf("%c", str[i]);
+    console_echo(str[i]);
   }
 }
 
@@ -58,7 +58,8 @@ void animate_cursor_reaction(void* cookie) {
     // draw new cursor
     cursor_at(r, col);
     console_color(cursor_color);
-    kprintf("%c", cursor_chars[cursor_idx]);
+    /*kprintf("%c", cursor_chars[cursor_idx]);*/
+    uart_send(UART0, cursor_chars[cursor_idx]);
     
     // Restore cursor position and color for user typing
     cursor_at(r, col);
