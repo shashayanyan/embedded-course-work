@@ -101,3 +101,13 @@ I didn't know anything about control sequences in terminal, quite interesting. A
 - QEMU Config: Updated the Makefile to instantiate a second serial port (-serial file:debug.log)
 
 - Console Config: Added a helper to use uart0 still for console. Not sure if needed for now?
+
+# Event-Oriented Streams & Ring Buffers
+
+- The goal is to fully decouple the UART hardware from the application logic to prevent the processor from ever blocking on I/O operations.
+
+- Built a circular buffer [ring.c](../ring.c) and an Asynchronous Stream API [stream.c](../stream.c). Refactored [console.c](../console.c) so it no longer knows about UART0; it simply dumps bytes into stream_write() and returns instantly. The actual transmission is handled in the background by the UART's TX interrupt.
+- Ran into 2 problems for this part:
+    - Challenge 1: Initialization Order. Encountered a silent failure where the console wouldn't clear on boot. The Fix: Reordered the boot sequence in main.c. console_init() (which immediately sends ANSI clear codes into the stream) must be called after stream_init() and uart_init(). Otherwise, the software queues and hardware masks are reset right after the console tries to write to them, erasing the commands.
+
+    - Challenge 2: "Priming the Pump". Even with the correct order, the console remained frozen. The Fix (based on ARM PL011 TRM - DDI0183G): The ARM PL011 UART TX interrupt relies on the FIFO crossing a threshold (a transition). Unmasking the TX interrupt when the hardware FIFO is already empty fails to create this transition. We modified uart0_unmask_tx_interrupt to manually push the first batch of bytes directly into the hardware FIFO. Once the hardware finishes sending that initial batch, the FIFO drops to empty, creating the physical transition that triggers the ISR for the rest of the buffer. (I understood and fixed this with gemini pro)
