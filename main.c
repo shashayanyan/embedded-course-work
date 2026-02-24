@@ -136,6 +136,15 @@ void on_uart_char(void* cookie) {
     // NO event_post here! We wait for the next interrupt.
 }
 
+// Background task to update the status bar every 1 second
+void status_bar_reaction(void* cookie) {
+    uint32_t cpu, events;
+    get_and_reset_stats(&cpu, &events);
+    uint32_t uptime_sec = system_seconds;
+    console_draw_status_bar(uptime_sec, cpu, events);
+    // do it again, in 1 sec
+    event_post(status_bar_reaction, NULL, 1000); 
+}
 
 /**
  * This is the C entry point, upcalled once the hardware has been setup properly
@@ -170,6 +179,8 @@ void _start() {
   // animate_cursor removed, I'm confident now that the timer and interrupts work...
 
   kprintf("[DEBUG] Hello Youssef From debug console!!!\n");
+
+  event_post(status_bar_reaction, NULL, 1000);    // update every sec (Status Bar)
   // start the scheduler.
   event_loop();
 }

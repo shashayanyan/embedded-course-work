@@ -40,5 +40,5 @@ void event_loop(void);
  * return the current time (mocked?).
  */
 uint64_t time_now(void);
-
+void get_and_reset_stats(uint32_t* cpu_usage, uint32_t* events);
 #endif /* _EVENT_H_ */

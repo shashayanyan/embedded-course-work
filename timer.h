@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 extern volatile uint64_t system_ticks;
-
+extern volatile uint32_t system_seconds;
 void timer_init(void);
 
 #endif 

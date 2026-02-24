@@ -16,10 +16,18 @@
 #define TIMER_32BIT   (1 << 1) // 32-bit counter
 
 volatile uint64_t system_ticks = 0;
-
+volatile uint32_t system_seconds = 0; // NEW: seconds for status bar
 static void timer_isr(uint32_t irq, void* cookie) {
     // 1. Advance the global system clock
     system_ticks++;
+
+    // seconds counter
+    static uint32_t ms_counter = 0;
+    ms_counter++;
+    if (ms_counter >= 1000) {
+        system_seconds++;
+        ms_counter = 0;
+    }
 
     // 2. Clear the interrupt at the timer hardware level
     mmio_write32((void*)TIMER0_BASE, TIMER_INTCLR, 1);

@@ -113,7 +113,8 @@ void console_clear() {
   /*kprintf("%c[H%c[2J", 27, 27);*/console_puts("\033[H\033[2J");
   cursor_row = 0;
   cursor_col = 0;
-  console_puts("List of commands:\n- echo str :: repeats the str\n- davinci str :: applies da vinci code to str and prints it\n- PRESS C-a c to stop the console\n");
+  cursor_down();
+  console_puts("List of commands:\n- echo <str> :: repeats the <str>\n- davinci <str> :: applies da vinci code to <str> and prints it\n- PRESS C-a c to stop the console\n");
   console_puts("simple-shell>$ ");
 }
 
@@ -143,6 +144,8 @@ void console_echo(uint8_t byte) {
           cursor_col++;
         }
       } else if (byte == 8 || byte == 127) { // backspace
+        // === backspace in middle of typed characters is dead ===
+        // needs to be fixed
         if (line_pos > 0) {
           line_pos--;
           cursor_left();
@@ -198,4 +201,28 @@ void console_echo(uint8_t byte) {
       echo_state = NORMAL;
       break;
   }
+}
+
+void console_draw_status_bar(uint32_t uptime_sec, uint32_t cpu, uint32_t events) {
+    int saved_r = cursor_row;
+    int saved_c = cursor_col;
+    cursor_at(0, 0); 
+    
+    // white background
+    console_color(7);
+    
+    // content
+    console_puts(" OS Uptime: ");
+    console_put_int(uptime_sec);
+    console_puts("s | CPU Usage: ");
+    console_put_int(cpu);
+    console_puts("% | Events/sec: ");
+    console_put_int(events);
+    console_puts("          "); // Extra space
+    
+    // resets colors back to normal
+    console_color(0);
+    
+    // Restore cursor 
+    cursor_at(saved_r, saved_c); 
 }

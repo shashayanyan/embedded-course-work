@@ -13,6 +13,21 @@ extern void wfi(void);
 static struct event event_queue[MAX_EVENTS];
 static int num_events = 0;
 
+// for status bar
+uint32_t idle_time_ms = 0;
+uint32_t events_processed = 0;
+
+// for the status bar
+void get_and_reset_stats(uint32_t* cpu_usage, uint32_t* events) {
+    // CPU usage = 100% - idle%
+    if (idle_time_ms > 1000) idle_time_ms = 1000;
+    *cpu_usage = 100 - (idle_time_ms / 10);
+    *events = events_processed;
+    
+    idle_time_ms = 0;
+    events_processed = 0;
+}
+
 uint64_t time_now(void) {
     // returning the real hardware-driven milliseconds
     return system_ticks;
@@ -67,7 +82,7 @@ void event_loop(void) {
             // mark as empty before running
             event_queue[best_event_idx].react = NULL;
             num_events--;
-
+            events_processed++;
             evt.react(evt.cookie);
 
         } 
@@ -90,9 +105,11 @@ void event_loop(void) {
             }
 
             if (best_event_idx == -1 || event_queue[best_event_idx].eta > now) {
+                uint64_t sleep_start = time_now();
                 // Still no work. It is safe to sleep.
                 wfi();           // sleep
                 irqs_enable();   // Re-enable interrupts
+                idle_time_ms += (time_now() - sleep_start);
             } else {
                 // Work snuck in so don't sleep, just re-enable interrupts and loop around...
                 irqs_enable();
