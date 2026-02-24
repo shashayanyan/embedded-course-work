@@ -111,3 +111,13 @@ I didn't know anything about control sequences in terminal, quite interesting. A
     - Challenge 1: Initialization Order. Encountered a silent failure where the console wouldn't clear on boot. The Fix: Reordered the boot sequence in main.c. console_init() (which immediately sends ANSI clear codes into the stream) must be called after stream_init() and uart_init(). Otherwise, the software queues and hardware masks are reset right after the console tries to write to them, erasing the commands.
 
     - Challenge 2: "Priming the Pump". Even with the correct order, the console remained frozen. The Fix (based on ARM PL011 TRM - DDI0183G): The ARM PL011 UART TX interrupt relies on the FIFO crossing a threshold (a transition). Unmasking the TX interrupt when the hardware FIFO is already empty fails to create this transition. We modified uart0_unmask_tx_interrupt to manually push the first batch of bytes directly into the hardware FIFO. Once the hardware finishes sending that initial batch, the FIFO drops to empty, creating the physical transition that triggers the ISR for the rest of the buffer. (I understood and fixed this with gemini pro)
+
+# Status Bar & Bare-Metal Math
+
+- Implemented a top-line status bar showing OS uptime, CPU usage, and events per second, updated asynchronously via a periodic background event.
+
+- Created status_bar_reaction to post itself every 1000ms. It calculates CPU usage by tracking the exact milliseconds the event pump spends asleep (wfi) versus awake, and draws the UI using white background `color 7`.
+
+- The Challenge: The build failed with a linker error: undefined reference to `__aeabi_uldivmod` when trying to calculate the uptime in seconds (time_now() / 1000).
+
+    - Fixed this issue using a direct seconds tracker variable that gets updated automatically in the timer.
