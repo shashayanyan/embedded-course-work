@@ -100,4 +100,6 @@ void console_init(void (*callback)(char*));
  */
 void console_echo(uint8_t byte);
 
+void console_puts(const char* str);
+void console_putc(uint8_t c);
 #endif /* _CONSOLE_H_ */

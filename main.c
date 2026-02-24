@@ -4,6 +4,7 @@
 #include "event.h"
 #include "isr.h"
 #include "timer.h"
+#include "stream.h"
 
 /*
  * Define ECHO_ZZZ to have a periodic reminder that this code is polling
@@ -59,7 +60,8 @@ void animate_cursor_reaction(void* cookie) {
     cursor_at(r, col);
     console_color(cursor_color);
     /*kprintf("%c", cursor_chars[cursor_idx]);*/
-    uart_send(UART0, cursor_chars[cursor_idx]);
+    //uart_send(UART0, cursor_chars[cursor_idx]);
+    console_putc(cursor_chars[cursor_idx]);
     
     // Restore cursor position and color for user typing
     cursor_at(r, col);
@@ -94,7 +96,7 @@ void poll_uart_reaction(void* cookie) {
 void on_uart_char(void* cookie) {
     uint8_t c;
     // We know data is ready because we got an interrupt!
-    if (uart_receive(UART0, &c)) {
+    while (stream_read(0, &c, 1) == 1) { // stream replacing uart_recieve
         console_echo(c);
     }
     // NO event_post here! We wait for the next interrupt.
@@ -106,20 +108,30 @@ void on_uart_char(void* cookie) {
  * in assembly language, see the startup.s file.
  */
 void _start() {
-  console_init(line_handler);
+  // 1. Initialize Software Queues & Data Structures
   event_init();
+  stream_init();
   //cursor_hide();
 
-  // add interrupt logic
+  // 2. Initialize Core Interrupts & VIC
   irqs_setup();
   irq_init();
+  // 3. Initialize Hardware Devices
   timer_init();
-  uart_enable_interrupt(on_uart_char, NULL);
+// 4. Connect Hardware Interrupts to the Stream API
+  uart_enable_interrupt();
+  stream_set_read_listener(0, on_uart_char, NULL);
+
+  // 5. Now the console
+  console_init(line_handler);
+
+// 6. Enable the CPU to start catching interrupts
   irqs_enable();
   
 
   // post initial events
   //event_post(poll_uart_reaction, NULL, 1);
+  // 7. Start background tasks and enter the Event Pump
   event_post(animate_cursor_reaction, NULL, 500);
 
   // start the scheduler.

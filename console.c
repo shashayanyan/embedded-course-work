@@ -2,7 +2,7 @@
 #include "main.h"
 #include "uart.h"
 #include <stdint.h>
-
+#include "stream.h"
 // cursor position
 static int cursor_row;
 static int cursor_col;
@@ -10,19 +10,27 @@ static int cursor_col;
 // line callback
 static void (*line_callback)(char*);
 
-// Helper to print a string to UART0
-void console_puts(const char* str) {
-    while (*str) {
-        uart_send(UART0, *str++);
-    }
+// Helper to write a single char to the stream
+void console_putc(uint8_t c) {
+    stream_write(0, &c, 1);
 }
 
-// Helper to print an integer to UART0 (for cursor positioning)
+// Helper to print a string to the stream (updated)
+void console_puts(const char* str) {
+  int len = 0;
+  while (str[len] != '\0') {
+      len++;
+  }
+  // Write the whole string to the ring buffer at once
+  stream_write(0, (uint8_t*)str, len);
+}
+
+// Helper to print an integer to the stream (updated)
 void console_put_int(int num) {
     char buf[10];
     int i = 0;
     if (num == 0) {
-        uart_send(UART0, '0');
+        console_putc('0');
         return;
     }
     while (num > 0) {
@@ -30,7 +38,7 @@ void console_put_int(int num) {
         num /= 10;
     }
     while (i > 0) {
-        uart_send(UART0, buf[--i]);
+        console_putc(buf[--i]);
     }
 }
 
@@ -66,12 +74,12 @@ void cursor_at(int row, int col) {
   cursor_row = row;
   cursor_col = col;
   /*kprintf("%c[%d;%dH", 27, row + 1, col + 1);*/
-  uart_send(UART0, 27); // ESC
-  uart_send(UART0, '[');
+  console_putc(27); // ESC
+  console_putc('[');
   console_put_int(row + 1);
-  uart_send(UART0, ';');
+  console_putc(';');
   console_put_int(col + 1);
-  uart_send(UART0, 'H');
+  console_putc('H');
 }
 
 void cursor_position(int* row, int* col) {
@@ -89,9 +97,10 @@ void cursor_show() {
 
 void console_color(uint8_t color) {
   /*kprintf("%c[%dm", 27, color);*/
-  console_puts("\033[");
+  console_putc(27);
+  console_putc('[');
   console_put_int(color);
-  console_puts("m");
+  console_putc('m');
 }
 
 void console_clear() {
@@ -121,7 +130,7 @@ void console_echo(uint8_t byte) {
     case NORMAL:
       if (byte >= 32 && byte <= 126) { // printable ASCII
         if (line_pos < LINE_LEN - 1) {
-          uart_send(UART0, byte);
+          console_putc(byte);
           line_buffer[line_pos++] = byte;
           cursor_col++;
         }
@@ -129,7 +138,7 @@ void console_echo(uint8_t byte) {
         if (line_pos > 0) {
           line_pos--;
           cursor_left();
-          uart_send(UART0, ' ');
+          console_putc(' ');
           //cursor_left();
         }
       } else if (byte == '\n' || byte == '\r') { // enter

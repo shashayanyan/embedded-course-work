@@ -35,11 +35,24 @@
 #define UART_IMSC 0x038
 // UART Interrupt Clear Register
 #define UART_ICR  0x044
+// Masked Interrupt Status Register
+#define UART_MIS  0x040 
 // Receive Interrupt Mask bit (Bit 4)
 #define UART_RXIM (1 << 4)
-static void (*user_handler)(void*) = NULL;
-static void* user_cookie = NULL;
+#define UART_TXIM (1 << 5)
+//static void (*user_handler)(void*) = NULL;
+//static void* user_cookie = NULL;
 // ======================================
+
+// ======================================
+extern void stream_rx_put_from_isr(uint8_t code);
+extern int stream_tx_empty_from_isr(void);
+extern uint8_t stream_tx_get_from_isr(void);
+extern void stream_fire_write_listener_from_isr(void);
+extern void irqs_disable(void);
+extern void irqs_enable(void);
+// ======================================
+
 
 /*
  * See "uart.h"
@@ -77,7 +90,7 @@ void uart_send_string(void* uart, const unsigned char *s) {
 }
 
 // handler to clear the hardware interrupt source
-static void internal_uart_handler(uint32_t irq, void* unused) {
+/*static void internal_uart_handler(uint32_t irq, void* unused) {
     // 1. Call the user's logic if exists
     if (user_handler) {
         user_handler(user_cookie);
@@ -86,11 +99,44 @@ static void internal_uart_handler(uint32_t irq, void* unused) {
     // 2. Acknowledge/Clear the interrupt at the UART controller
     // without this, the line stays high and the CPU hangs re-entering ISR.
     mmio_write16(UART0, UART_ICR, UART_RXIM); 
+}*/
+static void internal_uart_handler(uint32_t irq, void* unused) {
+    uint16_t mis = mmio_read16(UART0, UART_MIS); //WHO triggered the interrupt
+
+    // 1) Did we RECEIVE data? (RX)
+    if (mis & UART_RXIM) {
+        uint8_t c;
+        // Read all available bytes from hardware and put them in the Stream Ring
+        while (uart_receive(UART0, &c)) {
+            stream_rx_put_from_isr(c);
+        }
+        mmio_write16(UART0, UART_ICR, UART_RXIM); // Clear RX interrupt
+    }
+
+    // 2. Is there ROOM to SEND data? (TX)
+    if (mis & UART_TXIM) {
+        // fill the hardware TX FIFO 
+        // as long as we have data in the ring, and hardware isn't full
+        while (!stream_tx_empty_from_isr() && !(mmio_read16(UART0, UART_FR) & UART_TXFF)) {
+            uint8_t c = stream_tx_get_from_isr();
+            mmio_write8(UART0, UART_DR, c);
+        }
+
+        // If the ring is now empty, turn off the TX interrupt so it doesn't fire infinitely
+        if (stream_tx_empty_from_isr()) {
+            uint16_t imsc = mmio_read16(UART0, UART_IMSC);
+            imsc &= ~UART_TXIM;
+            mmio_write16(UART0, UART_IMSC, imsc);
+            
+            stream_fire_write_listener_from_isr(); // Notify application it can write more
+        }
+        mmio_write16(UART0, UART_ICR, UART_TXIM); // Clear TX interrupt
+    }
 }
 
-void uart_enable_interrupt(void (*handler)(void*), void* cookie) {
-    user_handler = handler;
-    user_cookie = cookie;
+void uart_enable_interrupt(void /*void (*handler)(void*), void* cookie*/) { //signature changed again
+    //user_handler = handler;
+    //user_cookie = cookie;
 
     // 1. Register our internal handler with the VIC
     irq_enable(UART0_IRQ, internal_uart_handler, NULL);
@@ -100,4 +146,27 @@ void uart_enable_interrupt(void (*handler)(void*), void* cookie) {
     uint16_t imsc = mmio_read16(UART0, UART_IMSC);
     imsc |= UART_RXIM;
     mmio_write16(UART0, UART_IMSC, imsc);
+}
+
+// helper function
+void uart0_unmask_tx_interrupt(void) {
+    // Disable CPU interrupts briefly to avoid race conditions with the ISR
+    irqs_disable(); 
+
+    // 1. push data to the hardware FIFO 
+    // until it is full or our ring buffer is empty.
+    while (!stream_tx_empty_from_isr() && !(mmio_read16(UART0, UART_FR) & UART_TXFF)) {
+        uint8_t c = stream_tx_get_from_isr();
+        mmio_write8(UART0, UART_DR, c);
+    }
+
+    // 2. If we STILL have data left in the ring buffer, unmask the TX interrupt 
+    // so the hardware wakes us up when it has finished sending this batch.
+    if (!stream_tx_empty_from_isr()) {
+        uint16_t imsc = mmio_read16(UART0, UART_IMSC);
+        imsc |= UART_TXIM;
+        mmio_write16(UART0, UART_IMSC, imsc);
+    }
+
+    irqs_enable();
 }
