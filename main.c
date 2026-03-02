@@ -17,7 +17,7 @@
 #define ECHO_ZZZ
 
 extern uint32_t stack_top;
-
+extern void console_blink_cursor(void);
 void panic() {
   while (1)
 	  ;
@@ -85,7 +85,7 @@ void line_handler(char* str) {
 
 // Reaction for the cursor
 void animate_cursor_reaction(void* cookie) {
-    static char cursor_chars[] = {'|', '/', '-', '\\'};
+    /* static char cursor_chars[] = {'|', '/', '-', '\\'};
     static int cursor_idx = 0;
     static uint8_t cursor_color = RED;
 
@@ -95,7 +95,7 @@ void animate_cursor_reaction(void* cookie) {
     // draw new cursor
     cursor_at(r, col);
     console_color(cursor_color);
-    /*kprintf("%c", cursor_chars[cursor_idx]);*/
+    kprintf("%c", cursor_chars[cursor_idx]);
     //uart_send(UART0, cursor_chars[cursor_idx]);
     console_putc(cursor_chars[cursor_idx]);
     
@@ -109,6 +109,10 @@ void animate_cursor_reaction(void* cookie) {
 
     // repost the event for the next frame
     event_post(animate_cursor_reaction, NULL, 500); // ~500ms??
+    */
+    console_blink_cursor();
+    // Repost the event for the next frame (500ms for a standard blink rate)
+    event_post(animate_cursor_reaction, NULL, 500);
 }
 
 // Reaction for polling UART
@@ -169,6 +173,7 @@ void _start() {
 
   // 5. Now the console
   console_init(line_handler);
+  stream_write(0, (uint8_t*)"\033[?25l", 6); // hiding system cursor
 
 // 6. Enable the CPU to start catching interrupts
   irqs_enable();
@@ -181,7 +186,7 @@ void _start() {
   // animate_cursor removed, I'm confident now that the timer and interrupts work...
 
   kprintf("[DEBUG] Hello Youssef From debug console!!!\n");
-
+  event_post(animate_cursor_reaction, NULL, 500);
   event_post(status_bar_reaction, NULL, 1000);    // update every sec (Status Bar)
   // start the scheduler.
   event_loop();

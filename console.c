@@ -7,16 +7,29 @@
 // cursor position
 static int cursor_row;
 static int cursor_col;
+static int cursor_visible = 0;
 
 // line callback
 static void (*line_callback)(char*);
+
+// line buffer
+#define LINE_LEN 80
+static char line_buffer[LINE_LEN];
+static int line_pos;
+
+static enum {
+  NORMAL,
+  ESCAPE,
+  ESCAPE_BRACKET
+} echo_state = NORMAL;
+
 
 // Helper to write a single char to the stream
 void console_putc(uint8_t c) {
     stream_write(0, &c, 1);
 }
 
-// Helper to print a string to the stream (updated)
+// Helper to print a string to the stream
 void console_puts(const char* str) {
   int len = 0;
   while (str[len] != '\0') {
@@ -32,7 +45,7 @@ void console_puts(const char* str) {
   stream_write(0, (uint8_t*)str, len);
 }
 
-// Helper to print an integer to the stream (updated)
+// Helper to print an integer to the stream
 void console_put_int(int num) {
     char buf[10];
     int i = 0;
@@ -48,6 +61,24 @@ void console_put_int(int num) {
         console_putc(buf[--i]);
     }
 }
+
+static void ansi_cmd(const char* cmd) { // helper for commands to avoid confusion
+    int len = 0;
+    while(cmd[len]) len++;
+    stream_write(0, (uint8_t*)cmd, len);
+}
+
+void console_erase_cursor(void) {
+    if (!cursor_visible) return;
+    char c = line_buffer[line_pos];
+    if (c == '\0') c = ' ';
+    
+    ansi_cmd("\033[0m"); // Force Normal Video
+    stream_write(0, (uint8_t*)&c, 1);
+    ansi_cmd("\033[1D"); // Step back to original position
+    cursor_visible = 0;
+}
+
 
 void cursor_left() {
   if (cursor_col > 0) {
@@ -111,11 +142,10 @@ void console_color(uint8_t color) {
 }
 
 void console_clear() {
-  /*kprintf("%c[H%c[2J", 27, 27);*/console_puts("\033[H\033[2J");
-  cursor_row = 0;
+  ansi_cmd("\033[2;1H\033[0J");  
+  cursor_row = 1;
   cursor_col = 0;
-  cursor_down();
-  console_puts("List of commands:\n- echo <str> :: repeats the <str>\n- davinci <str> :: applies da vinci code to <str> and prints it\n- PRESS C-a c to stop the console\n");
+  console_puts("List of commands:\n- echo <str> :: repeats the <str>\n- davinci <str> :: applies da vinci code to <str> and prints it\n- PRESS C-c to clear console.\n- PRESS C-a c to stop the console\n");
   console_puts("simple-shell>$ ");
 }
 
@@ -124,37 +154,83 @@ void console_init(void (*callback)(char*)) {
   line_callback = callback;
 }
 
-// line buffer
-#define LINE_LEN 80
-static char line_buffer[LINE_LEN];
-static int line_pos;
 
-static enum {
-  NORMAL,
-  ESCAPE,
-  ESCAPE_BRACKET
-} echo_state = NORMAL;
+static void clear_line_buffer(void) {
+    for (int i = 0; i < 80; i++) { 
+        line_buffer[i] = '\0';
+    }
+    line_pos = 0;
+}
 
 void console_echo(uint8_t byte) {
   switch (echo_state) {
     case NORMAL:
+      ansi_cmd("\033[0m");
+      console_erase_cursor();
       if (byte >= 32 && byte <= 126) { // printable ASCII
-        if (line_pos < LINE_LEN - 1) {
-          console_putc(byte);
-          line_buffer[line_pos++] = byte;
-          cursor_col++;
+        // 1. Find the end of the string
+        int end = line_pos;
+        while (line_buffer[end] != '\0') end++;
+        // 2. Shift memory RIGHT to make room 
+        if (end < 79) {
+            for (int i = end; i >= line_pos; i--) {
+                line_buffer[i + 1] = line_buffer[i]; 
+            }
+            line_buffer[line_pos] = byte;
+            
+            // 3. Visually draw the new character AND the shifted rest-of-line
+            int chars_drawn = 0;
+            int draw_idx = line_pos;
+            while (line_buffer[draw_idx] != '\0') {
+                stream_write(0, (uint8_t*)&line_buffer[draw_idx], 1);
+                draw_idx++;
+                chars_drawn++;
+            }
+            
+            // 4. Update trackers
+            line_pos++;
+            cursor_col++;
+            
+            // 5. Move physical cursor back to the correct spot
+            // drew hars_drawn characters, but only advanced 1 space
+            for (int d = 0; d < chars_drawn - 1; d++) {
+                ansi_cmd("\033[1D");
+            }
         }
+
       } else if (byte == 8 || byte == 127) { // backspace
         // === backspace in middle of typed characters is dead ===
-        // needs to be fixed
+        // needs to be fixed : IT'S FIXED NOW!!
         if (line_pos > 0) {
-          line_pos--;
-          cursor_left();
-          console_putc(' ');
-          cursor_col++; // was missing
-          cursor_left();
-          // nvm figured it out
-          //console_puts("\b \b"); // for some reason this works but not the 3 lines above
+            // 1. Shift memory LEFT to close the gap
+            int i = line_pos;
+            while (line_buffer[i] != '\0') {
+                line_buffer[i - 1] = line_buffer[i];
+                i++;
+            }
+            line_buffer[i - 1] = '\0'; 
+            
+            // 2. Update trackers
+            line_pos--;
+            cursor_left();
+            
+            // 3. draw the shifted rest ofline
+            int chars_drawn = 0;
+            int draw_idx = line_pos;
+            while (line_buffer[draw_idx] != '\0') {
+                stream_write(0, (uint8_t*)&line_buffer[draw_idx], 1);
+                draw_idx++;
+                chars_drawn++;
+            }
+            
+            // 4. Print a space at the end to erase the trailing duplicate character
+            stream_write(0, (uint8_t*)" ", 1);
+            chars_drawn++;
+            
+            // 5. Move physical cursor all the way back
+            for (int d = 0; d < chars_drawn; d++) {
+                ansi_cmd("\033[1D");
+            }
         }
       } else if (byte == '\n' || byte == '\r') { // enter
         line_buffer[line_pos] = '\0';
@@ -167,9 +243,13 @@ void console_echo(uint8_t byte) {
         if (line_callback) {
           line_callback(line_buffer);
         }
+
+        // 3. Empty buffer
+        clear_line_buffer();
       } else if (byte == 3) { // Ctrl-C
         cursor_col = 16;
         line_pos = 0;
+        clear_line_buffer();
         console_clear();
       } else if (byte == 27) {
         echo_state = ESCAPE;
@@ -193,10 +273,17 @@ void console_echo(uint8_t byte) {
           history_request(1, console_replace_line);
           break;
         case 'C': // right
-          cursor_right();
+          // Only move right if there is actually text ahead
+            if (line_buffer[line_pos] != '\0') {
+                line_pos++;
+                cursor_right(); 
+            }
           break;
         case 'D': // left
-          cursor_left();
+          if (line_pos > 0) {
+                line_pos--;
+                cursor_left(); 
+            }
           break;
       }
       echo_state = NORMAL;
@@ -220,6 +307,8 @@ void console_draw_status_bar(uint32_t uptime_sec, uint32_t cpu, uint32_t events)
     console_puts("% | Events/sec: ");
     console_put_int(events);
     console_puts("          "); // Extra space
+
+    console_puts("\033[K");
     
     // resets colors back to normal
     console_color(0);
@@ -248,4 +337,21 @@ void console_replace_line(const char* new_line) {
     }
     line_buffer[i] = '\0';
     line_pos = i;
+}
+
+void console_blink_cursor(void) {
+    char c = line_buffer[line_pos];
+    if (c == '\0') c = ' '; // If at end of line, highlight empty space
+    
+    cursor_visible = !cursor_visible;
+    
+    if (cursor_visible) {
+        ansi_cmd("\033[7m"); // Reverse video ON
+    } else {
+        ansi_cmd("\033[0m"); // Reverse video OFF
+    }
+    
+    stream_write(0, (uint8_t*)&c, 1);
+    ansi_cmd("\033[0m"); 
+    ansi_cmd("\033[1D"); 
 }
