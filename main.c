@@ -5,6 +5,7 @@
 #include "isr.h"
 #include "timer.h"
 #include "stream.h"
+#include "history.h"
 
 /*
  * Define ECHO_ZZZ to have a periodic reminder that this code is polling
@@ -48,6 +49,7 @@ static int starts_with(const char *prefix, const char *str){
 }
 
 void line_handler(char* str) {
+  history_add(str);
   if (starts_with("echo ", str)) {
     console_puts(&str[5]);
     console_puts("\r\n"); // Make sure to use \r\n, not just \n

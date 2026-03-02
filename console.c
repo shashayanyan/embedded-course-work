@@ -3,6 +3,7 @@
 #include "uart.h"
 #include <stdint.h>
 #include "stream.h"
+#include "history.h"
 // cursor position
 static int cursor_row;
 static int cursor_col;
@@ -186,10 +187,10 @@ void console_echo(uint8_t byte) {
     case ESCAPE_BRACKET:
       switch (byte) {
         case 'A': // up
-          cursor_up();
+          history_request(-1, console_replace_line);          
           break;
         case 'B': // down
-          cursor_down();
+          history_request(1, console_replace_line);
           break;
         case 'C': // right
           cursor_right();
@@ -225,4 +226,26 @@ void console_draw_status_bar(uint32_t uptime_sec, uint32_t cpu, uint32_t events)
     
     // Restore cursor 
     cursor_at(saved_r, saved_c); 
+}
+
+void console_replace_line(const char* new_line) {
+    // 1. Visually erase the current line on the screen
+    while (line_pos > 0) {
+        cursor_left();
+        console_putc(' ');
+        cursor_col++;
+        cursor_left();
+        line_pos--;
+    }
+    
+    // 2. Copy the new line into our buffer and print it
+    int i = 0;
+    while (new_line[i] != '\0' && i < 79) {
+        line_buffer[i] = new_line[i];
+        console_putc(new_line[i]);
+        cursor_col++;
+        i++;
+    }
+    line_buffer[i] = '\0';
+    line_pos = i;
 }

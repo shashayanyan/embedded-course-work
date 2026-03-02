@@ -103,4 +103,6 @@ void console_echo(uint8_t byte);
 void console_puts(const char* str);
 void console_putc(uint8_t c);
 void console_draw_status_bar(uint32_t uptime_sec, uint32_t cpu, uint32_t events);
+void console_replace_line(const char* new_line);
+
 #endif /* _CONSOLE_H_ */
