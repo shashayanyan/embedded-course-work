@@ -121,3 +121,18 @@ I didn't know anything about control sequences in terminal, quite interesting. A
 - The Challenge: The build failed with a linker error: undefined reference to `__aeabi_uldivmod` when trying to calculate the uptime in seconds (time_now() / 1000).
 
     - Fixed this issue using a direct seconds tracker variable that gets updated automatically in the timer.
+
+
+# Asynchronous Command History 
+- Connected the Up/Down arrow keys to the background History Service. Instead of blocking, the console dispatches an asynchronous request to the Event Pump. When the CPU has time, the service processes the request and fires a callback to visually replace the user's current line with the historical command.
+
+
+# Shell UI Enhancements & Advanced Text Editing
+
+- `The Final Deliverable`: Turn the basic shell into a robust, professional command-line interface with history navigation, a custom cursor, and true insert-mode text editing.
+
+- State Synchronization (ansi_cmd): Encountered severe bugs where the software cursor (cursor_col) became desynchronized from the physical terminal cursor. The Fix: Discovered that sending invisible ANSI escape codes through standard print functions artificially inflated the column tracker. Created a dedicated ansi_cmd helper that writes directly to the hardware stream, keeping internal state pristine while manipulating the terminal.
+
+- Custom Blinking Cursor: Disabled the native hardware cursor in favor of a custom software cursor using ANSI reverse video (\033[7m). Fixed visual "white trail" artifacts by extracting the cursor_visible state into a shared variable, ensuring the highlight is forcefully erased (\033[0m) before processing any new keystrokes or movements. Had multiple bugs where white blocks would be left in the console before arriving at this solution.
+
+- Insert/Delete Stitching (Backspacing): Upgraded the shell from primitive "typewriter" overwriting to a modern text editor.  When typing or backspacing in the middle of a word, the console now shifts the line_buffer memory right or left to close gaps or make room. It then visually redraws the shifted remainder of the line and uses ansi_cmd to backtrack the physical cursor exactly to the user's editing position. `This is my personal favorite functionality I guess :)`

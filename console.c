@@ -233,7 +233,7 @@ void console_echo(uint8_t byte) {
             }
         }
       } else if (byte == '\n' || byte == '\r') { // enter
-        line_buffer[line_pos] = '\0';
+        //line_buffer[line_pos] = '\0';
         
         // 1. Move the terminal to a new line visually BEFORE the callback
         console_puts("\r\n");
