@@ -209,7 +209,7 @@ Debug output is routed to `debug.log` in QEMU.
 
 ## Author
 
-Youssef Shayanyan
+Shashayanyan
 
 ## License
 
